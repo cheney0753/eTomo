@@ -8,6 +8,6 @@ setup(name = 'astra-et',
       author = 'Zhichao Zhong',
       author_email = 'zhong@cwi.nl',
       license = license,
-      packages = find_packages( include = ('astra-et',), exclude =('tests','data', 'samples'))
+      packages = find_packages( include = ('astraet',), exclude =('tests','data', 'samples'))
       )
 
