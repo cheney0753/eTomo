@@ -1,7 +1,7 @@
 Metadata-Version: 1.0
-Name: astra-et
+Name: eTomo
 Version: 0.1
-Summary: The astra toolkit for electron tomography.
+Summary: The toolbox for electron tomography.
 Home-page: UNKNOWN
 Author: Zhichao Zhong
 Author-email: zhong@cwi.nl

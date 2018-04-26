@@ -1,5 +1,0 @@
-README.md
-astra_et.egg-info/PKG-INFO
-astra_et.egg-info/SOURCES.txt
-astra_et.egg-info/dependency_links.txt
-astra_et.egg-info/top_level.txt
