@@ -1,11 +1,13 @@
-# astra-et
+# eTomo
 
-Electron tomography toolbox based on the ASTRA Tomography Toolbox 
+Electron tomography toolbox  
 
-The astra-et is a python toolbox made for electron tomography 
+eTomo is a python toolbox made for electron tomography 
+
 The basic forward and backward projection operations are based on the GPU-accelerated ASTRA-toolbox
 http://www.astra-toolbox.com/
-This toolbox provides tools and reconstruction algorithms frequently used tools for electron tomography, mainly for materials science.
+
+This toolbox provides tools and reconstruction algorithms frequently used for building a electron tomographic pipeline, mainly for materials science. 
 
 ## Installations
 
@@ -75,6 +77,7 @@ Examples
 ## Acknowledgment:
 
 This software is a product of the computational imaging group at CWI, Amsterdam https://www.cwi.nl/research/groups/computational-imaging
+
 Copyright: 2018, CWI, Amsterdam http://www.cwi.nl/
 
 
