@@ -1,6 +1,6 @@
 import numpy as np
 import os, sys
-from Collections import OrderedDict
+from collections import OrderedDict
 
 MRC_2014_SPEC_TABLE = """
 +---------+--------+----------+--------+-------------------------------+
@@ -285,7 +285,7 @@ class MRCreader(object):
 #     for field in OMRC_2014_SPEC_DICT:
 #        print(field) 
 
-# # def read_extended_header(filename):
+# def read_extended_header(filename):
 
 # def read_mrc(filename, dtype):
 
