@@ -146,14 +146,16 @@ class Projection_data:
         self.__data_odl = self.__data_odl /std_
         return std_
     
-    def normalize_01(self):
-        """ normalize the data, divided by the standard deviation."""
+    def normalize_01(self, max_r = 10):
+        """ normalize the data to [0, max_r]"""
         min_v = self.__data_odl.asarray().min()
         
         self.__data_odl -= min_v
         
         self.__data_odl /=  self.__data_odl.asarray().max()
-
+        
+        self.__data_odl *= max_r
+        
         return self.__data_odl.asarray().max()
     
     def smooth(self, method = 'Gaussian'):
@@ -265,9 +267,8 @@ class Projection_data:
             except:
                 raise Exception('data_h not defined properly.')
             
-            print(alg)
             x = rec_joined_TNV(self.__data_odl, data_h.data_odl,
-                               self.geometries.ray_trafo, norm, n_iter, lmbd,
+                               self.geometries.ray_trafo, data_h.geometries.ray_trafo, norm, n_iter, lmbd,
                                nonnegativity, algorithm = alg, 
                                callback = callback)
             return [xi.asarray() for xi in x]
@@ -398,18 +399,13 @@ def rec_TNV(data_odl, ray_trafo, rec_sup, norm = 'L2', n_iter = 100, lmbd = 0.0,
         odl.solvers.douglas_rachford_pd(x, f, g, lin_ops, tau=tau, sigma=sigma, niter=n_iter, callback = callback)
     return x[0]
 
-def rec_joined_TNV(data_e, data_h, ray_trafo, norm = 'L2', n_iter = 100, lmbd = 0.0, nonnegativity = True, algorithm = 'DR', callback = None):
+def rec_joined_TNV(data_e, data_h, ray_trafo_e, ray_trafo_h, norm = 'L2', n_iter = 100, lmbd = 0.0, nonnegativity = True, algorithm = 'DR', callback = None):
     
     """ 
     Solve the reconstruction problem with the recipe defined by the parameters
     Parameters
     __________
-    nit: int
-        The number of iterations
-    reg_par_em: float
-        Weight of the regularization term defined in emTomo.elemental_maps
-    reg_par_hp: float
-        Weight of the regularization term defined in emTomo.projections
+
         
     Reference:
     ------
@@ -417,32 +413,34 @@ def rec_joined_TNV(data_e, data_h, ray_trafo, norm = 'L2', n_iter = 100, lmbd = 
     https://github.com/odlgroup/odl/blob/a11a69a760359b9482a150554ac4cb4f20bc4b90/examples/solvers/nuclear_norm_tomography.py
     
     """
-    oplist = [ray_trafo, ray_trafo]
+    oplist = [ray_trafo_e, ray_trafo_h]
     op_diag = odl.DiagonalOperator(*oplist)
 
+    assert ray_trafo_e.domain == ray_trafo_h.domain
+    
     # domain is 
-    domain = odl.ProductSpace(ray_trafo.domain, ray_trafo.domain)             
+    domain = odl.ProductSpace(ray_trafo_e.domain, ray_trafo_h.domain)             
     
     # Create box constraint functional ( non-negativity constraint)
     f = odl.solvers.IndicatorBox(domain, lower = 0 )
     
     # Create data discrepancy functionals
     if norm == 'KL':
-        g_e = odl.solvers.KullbackLeibler(ray_trafo.range, prior=data_e)
+        g_e = odl.solvers.KullbackLeibler(ray_trafo_e.range, prior=data_e)
       
     elif norm == 'L2':
-        g_e = odl.solvers.L2NormSquared(ray_trafo.range).translated(data_e)
+        g_e = odl.solvers.L2NormSquared(ray_trafo_e.range).translated(data_e)
         
     # Create data discrepancy functionals for the sum data
 
-    g_h = odl.solvers.L2NormSquared(ray_trafo.range).translated(data_h)
+    g_h = odl.solvers.L2NormSquared(ray_trafo_h.range).translated(data_h)
 
     # Assemble functionals
     g_data = odl.solvers.SeparableSum(g_e, g_h)
     # Create regularization functional
     
     # Gradient
-    grad = odl.Gradient(ray_trafo.domain)
+    grad = odl.Gradient(ray_trafo_e.domain)
     grad_n = odl.DiagonalOperator(grad, 2)
 
     # Set the nuclear norm.
