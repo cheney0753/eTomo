@@ -146,7 +146,7 @@ class Projection_data:
         self.__data_odl = self.__data_odl /std_
         return std_
     
-    def normalize_01(self, max_r = 10):
+    def normalize_01(self, max_r = 1):
         """ normalize the data to [0, max_r]"""
         min_v = self.__data_odl.asarray().min()
         
