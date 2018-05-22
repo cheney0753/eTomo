@@ -56,7 +56,7 @@ class Geometries:
             if cond[i]:
                 astra_proj_geom['ProjectionAngles'][i]-=1e-5
                 
-        angle_partition = odl.nonuniform_partition(astra_proj_geom['ProjectionAngles'])
+        angle_partition = odl.nonuniform_partition(astra_proj_geom['ProjectionAngles'].squeeze())
         
         # set up the 2d geometry in odl
         if self.dim == 2 :
@@ -100,16 +100,18 @@ class Projection_data:
     def __init__(self, data, geometries):
         """
         Define a tomographic reconstruction problem with optional regularization as following
-        ```
-            x = argmin_x sum_e norm( p - W * x ) + lambda * regularization(x)
-        ```
+        
+        ..math : 
+            x = \argmin_x sum_e norm( p - W * x ) + lambda * regularization(x)
+        
+        
         The regularization term can total variation TV(x).
         
         Args:
         ----------
         geometries : object of the geometries 
             The geometries defining the forward projection model
-        data : numpy.ndarray
+        data : numpy.ndarray, in the odl data shape
             shape: P*M*N where N is the row number, self.data[:,:,m] is one sinogram
         norm : 'L2' or 'KL' 
             Defining the norm of data fidelity term
@@ -130,11 +132,10 @@ class Projection_data:
 
         self.geometries = geometries
         
-        # Note the data dimension order in odl is [num_angles,  num_row, num_col,]
-        if self.geometries.dim == 3:
-            # data =  data.swapaxes(0,2).swapaxes(0, 1)
-            data = np.transpose(data, (1, 2, 0))
+        # Note the data dimension order in odl is [num_angles,  num_row, num_col]
+        # while in astra, it is [ num_col, num_angles,  num_row]W
         
+        #copy the data into a an odl.data instance
         self.__data_odl = self.geometries.ray_trafo.range.element(data.copy(), dtype = np.float32)    
 
     def normalize(self, std_ = 0):
@@ -145,6 +146,19 @@ class Projection_data:
         self.__data_odl = self.__data_odl /std_
         return std_
     
+    def normalize_01(self):
+        """ normalize the data, divided by the standard deviation."""
+        min_v = self.__data_odl.asarray().min()
+        
+        self.__data_odl -= min_v
+        
+        self.__data_odl /=  self.__data_odl.asarray().max()
+
+        return self.__data_odl.asarray().max()
+    
+    def smooth(self, method = 'Gaussian'):
+        """ smooth the projection data"""
+        
     @property
     def data_odl(self):
         '''
@@ -164,7 +178,7 @@ class Projection_data:
     @property
     def data(self):
         '''return the data in the numpy array'''
-        return self.__data_odl.asarray
+        return self.__data_odl.asarray()
 
     @data.setter
     def data(self, data):
@@ -186,22 +200,48 @@ class Projection_data:
         """
         self.__data_odl = self.geometries.ray_trafo.range.element(data.copy(), dtype = np.float32)
 
-    def reconstruct(self, norm, regularization, alg = 'PDHG', n_iter = 20, lmbd = 0.0, nonnegativity = True, callback = None,  **kwargs):
+    def reconstruct(self, norm, regularization, alg = 'DR', n_iter = 20, lmbd = 0.0,
+                    nonnegativity = True, callback = None,  **kwargs):
         """
         Reconstruct from the projdata.
+        
         Args :
+            
         _____________
-
-        alg : string
-            the numerical algorithm, one of ('SIRT', 'EM', 'PDHG'). PDHG is the chamboll-pock algorithm 
+        
+        norm : str
+            'L2' or 'KL', which stands for l2 and Kullback-Leibler
+        alg : str
+            the numerical algorithm, one of ('PDHG', 'DR'). 
+            PDHG is the chamboll-pock algorithm 
+        n_iter : int
+            iteration number
+        lmbd : float
+            lambda, regularization parameter
+        nonnegativity: bool
+            non-nengativity constraint
+        callback :
+            odl.callback
+        **kwargs : keyword arguments
+            rec_sub : predefined reconstruction for the TNV regularization
+            data_h : Projection_data instance for the joined-TNV reconstruction
+            
+        Return :
+            
+        ____________
+        
         """
+        
+        #TODO: impletment SIRT algorithm
         if not regularization:
             if alg not in ('PDHG', 'DR'):
                 print('Only the PDHG or DR algorithm is available for TV. Switch to the PDHG algorithm.')
                 alg = 'PDHG'
                 
         if regularization is 'TV':
-            x = rec_odl(self.__data_odl, self.geometries.ray_trafo, norm, n_iter, lmbd, nonnegativity, algorithm = alg, callback = callback)
+            x = rec_odl(self.__data_odl, self.geometries.ray_trafo, norm, n_iter, 
+                        lmbd, nonnegativity, algorithm = alg, callback = callback)
+            return x.asarray()
 
         elif regularization is 'TNV':
             try:
@@ -213,12 +253,31 @@ class Projection_data:
                 rec_sub_odl = self.geometries.ray_trafo.domain.element(rec_sub)
             except:
                 raise Exception('rec_sub must have the same data shape.')
-            x = rec_joined_rec(self.__data_odl, self.geometries.ray_trafo, rec_sub_odl, norm, n_iter, lmbd, nonnegativity, regularization, algorithm = alg, callback = callback)
+            x = rec_TNV(self.__data_odl, self.geometries.ray_trafo, rec_sub_odl, 
+                        norm, n_iter, lmbd, nonnegativity, regularization, 
+                        algorithm = alg, callback = callback)
+            return x.asarray()
+
+        elif regularization is 'joined_TNV':
+            try:
+                data_h = kwargs['data_h']
+                assert isinstance(data_h, Projection_data)
+            except:
+                raise Exception('data_h not defined properly.')
+            
+            print(alg)
+            x = rec_joined_TNV(self.__data_odl, data_h.data_odl,
+                               self.geometries.ray_trafo, norm, n_iter, lmbd,
+                               nonnegativity, algorithm = alg, 
+                               callback = callback)
+            return [xi.asarray() for xi in x]
 
     #TODO: implement the SIRT and EM algorithm, implement the TNV joint regularization
-        return x.asarray()
 
-def rec_odl(data_odl, ray_trafo, norm = 'L2', n_iter = 100, lmbd = 0.0, nonnegativity = True, regularization = 'TV', algorithm = 'PDHG', callback = None):
+    
+def rec_odl(data_odl, ray_trafo, norm = 'L2', n_iter = 100, lmbd = 0.0, 
+            nonnegativity = True, regularization = 'TV', algorithm = 'PDHG', 
+            callback = None):
     """
     tomographic reconstruction pdhg algorithm defined for the projection_data class
 
@@ -281,10 +340,11 @@ def rec_odl(data_odl, ray_trafo, norm = 'L2', n_iter = 100, lmbd = 0.0, nonnegat
             lin_ops = [ray_trafo, grad]
         tau = 2.0 / len(lin_ops)
         sigma = [1 / odl.power_method_opnorm(op, rtol=0.1)**2 for op in lin_ops]
+        print('TV lambda:', lmbd)
         odl.solvers.douglas_rachford_pd(x, f, g, lin_ops, tau=tau, sigma=sigma, niter=n_iter, callback = callback)
     return x
 
-def rec_joined_rec(data_odl, ray_trafo, rec_sup, norm = 'L2', n_iter = 100, lmbd = 0.0, nonnegativity = True, regularization = 'TNV', algorithm = 'PDHG', callback = None):
+def rec_TNV(data_odl, ray_trafo, rec_sup, norm = 'L2', n_iter = 100, lmbd = 0.0, nonnegativity = True, algorithm = 'DR', callback = None):
     """
     tomographic reconstruction pdhg algorithm defined for the projection_data class
 
@@ -293,8 +353,8 @@ def rec_joined_rec(data_odl, ray_trafo, rec_sup, norm = 'L2', n_iter = 100, lmbd
     
     """
     assert norm in ('KL', 'L2')
-    assert regularization in ('TNV',)
     assert algorithm in ('PDHG', 'DR')
+    
     try:
         assert rec_sup.space == ray_trafo.domain
     except:
@@ -320,11 +380,8 @@ def rec_joined_rec(data_odl, ray_trafo, rec_sup, norm = 'L2', n_iter = 100, lmbd
     op_ident = odl.IdentityOperator(rec_sup.space)
     g_sup = odl.solvers.IndicatorZero(rec_sup.space).translated(rec_sup)
     
-    if regularization is 'TNV':
-        diag_grad = odl.DiagonalOperator(grad, grad)
-        g_reg = lmbd * odl.solvers.NuclearNorm(diag_grad.range, singular_vector_exp = 1)
-    else:
-        raise Exception('Regularization method not defined.')
+    diag_grad = odl.DiagonalOperator(grad, grad)
+    g_reg = lmbd * odl.solvers.NuclearNorm(diag_grad.range, singular_vector_exp = 1)
 
     g_sum = odl.solvers.SeparableSum(g_data, g_sup)
     op_diag = odl.DiagonalOperator(ray_trafo, op_ident) 
@@ -332,17 +389,6 @@ def rec_joined_rec(data_odl, ray_trafo, rec_sup, norm = 'L2', n_iter = 100, lmbd
     x = domain.zero()
     if algorithm is 'PDHG': 
         raise Exception('PDHG for tnv regularization is not implemented yet, because odl.BroadcastOperator() does not support sub-operators. Use DR algorithm instead.') 
-        # g = odl.solvers.SeparableSum(g_sum, g_reg)
-        # lin_ops = odl.BroadcastOperator(op_diag, diag_grad)
-        # op_norm = 1.1 * odl.power_method_opnorm(lin_ops, maxiter=4)
-        # tau = sigma = 1.0 / op_norm
-
-        # if odl.__version__ >= '0.6.1':
-        #     pdhg_solver = odl.solvers.pdhg
-        # else:
-        #     pdhg_solver = odl.solvers.chambolle_pock_solver
-
-        # pdhg_solver(x, g, f, lin_ops, tau=tau, sigma=sigma, niter=n_iter, callback = callback)
     elif algorithm is 'DR':
 
         g = [g_sum, g_reg]
@@ -351,3 +397,68 @@ def rec_joined_rec(data_odl, ray_trafo, rec_sup, norm = 'L2', n_iter = 100, lmbd
         sigma = [1 / odl.power_method_opnorm(op, rtol=0.1)**2 for op in lin_ops]
         odl.solvers.douglas_rachford_pd(x, f, g, lin_ops, tau=tau, sigma=sigma, niter=n_iter, callback = callback)
     return x[0]
+
+def rec_joined_TNV(data_e, data_h, ray_trafo, norm = 'L2', n_iter = 100, lmbd = 0.0, nonnegativity = True, algorithm = 'DR', callback = None):
+    
+    """ 
+    Solve the reconstruction problem with the recipe defined by the parameters
+    Parameters
+    __________
+    nit: int
+        The number of iterations
+    reg_par_em: float
+        Weight of the regularization term defined in emTomo.elemental_maps
+    reg_par_hp: float
+        Weight of the regularization term defined in emTomo.projections
+        
+    Reference:
+    ------
+    check the odl example code: nuclearn_norm_tomography.py
+    https://github.com/odlgroup/odl/blob/a11a69a760359b9482a150554ac4cb4f20bc4b90/examples/solvers/nuclear_norm_tomography.py
+    
+    """
+    oplist = [ray_trafo, ray_trafo]
+    op_diag = odl.DiagonalOperator(*oplist)
+
+    # domain is 
+    domain = odl.ProductSpace(ray_trafo.domain, ray_trafo.domain)             
+    
+    # Create box constraint functional ( non-negativity constraint)
+    f = odl.solvers.IndicatorBox(domain, lower = 0 )
+    
+    # Create data discrepancy functionals
+    if norm == 'KL':
+        g_e = odl.solvers.KullbackLeibler(ray_trafo.range, prior=data_e)
+      
+    elif norm == 'L2':
+        g_e = odl.solvers.L2NormSquared(ray_trafo.range).translated(data_e)
+        
+    # Create data discrepancy functionals for the sum data
+
+    g_h = odl.solvers.L2NormSquared(ray_trafo.range).translated(data_h)
+
+    # Assemble functionals
+    g_data = odl.solvers.SeparableSum(g_e, g_h)
+    # Create regularization functional
+    
+    # Gradient
+    grad = odl.Gradient(ray_trafo.domain)
+    grad_n = odl.DiagonalOperator(grad, 2)
+
+    # Set the nuclear norm.
+    g_reg = lmbd * odl.solvers.NuclearNorm(grad_n.range, singular_vector_exp = 1)
+    
+    # Compute step length parameters to satisfy the condition
+    # (see odl.solvers.douglas_rachford_pd) for more info
+    # Solve
+    if algorithm is 'PDHG': 
+        raise Exception('PDHG for tnv regularization is not implemented yet, because odl.BroadcastOperator() does not support sub-operators. Use DR algorithm instead.') 
+    elif algorithm is 'DR':
+        x = domain.zero()
+        g = [g_data, g_reg]
+        lin_ops = [op_diag, grad_n]
+        tau = 2.0 / len(lin_ops)
+        sigma = [1 / odl.power_method_opnorm(op, rtol=0.1)**2 for op in lin_ops]
+        odl.solvers.douglas_rachford_pd(x, f, g, lin_ops, tau=tau, sigma=sigma, niter=n_iter, callback = callback)
+
+    return x

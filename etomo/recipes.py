@@ -36,10 +36,10 @@ class BT_recipe(object):
     def cook(self, n_iter, alpha = 0.0, lmbd = 0.0, callback = None, rec_in = None):
         if self.__ingredients['hebt'] == 'HEBT':
             if self.__ingredients['reg'] == 'TV':
-                x = dg_solver(self.projdata_e, self.projdata_e, n_iter, self.__ingredients['data'], regl = 'TV', lmbd = lmbd, alpha = alpha, callback = callback)
+                x = dg_solver(self.projdata_e, self.projdata_h, n_iter, self.__ingredients['data'], regl = 'TV', lmbd = lmbd, alpha = alpha, callback = callback)
             if self.___ingredients['reg'] == 'TNV':
-
-
+                x = dg_solver(self.projdata_e, self.projdata_h, n_iter, self.__ingredients['data'], regl = 'TNV', lmbd = lmbd, alpha = alpha, callback = callback)
+                
     @property
     def ingredients():
         return self.__ingredients_
@@ -54,25 +54,26 @@ def dg_solver(projdata_e, projdata_h, nit, norm_e = 'L2', norm_d = 'L2', rec_sup
 
     Args:
     __________
-    nit: int
+    nit : int
         The number of iterations
-    reg_par_em: float
-        Weight of the regularization term defined in emTomo.elemental_maps
-    reg_par_hp: float
-        Weight of the regularization term defined in emTomo.projections
-
+    alpha : float
+        Weight for data disrepancy for projdata_e
+    beta : float
+        Weight of data discrepancy for projdata_h
+    lmbd : float
+        Regularization parameter
     Notes:
     __________
     The function solves optimization problem in this general form:
 
     .. math::
-       \{x^{e}\}, x^h = (1-\alpha)\sum_e d( W^e x^e, p^e) + d(w^h x^h, p^h) + \alpha d(\sum_e w^h x^e, p^h) + \lambda r({x^e}, x^h),
+       \{x^{e}, x^h \} = argmin (1-alpha)\sum_e d( W^e x^e, p^e) + d(w^h x^h, p^h) + alpha d(\sum_e w^h x^e, p^h) + \lambda r({x^e}, x^h),
 
     where :math:`d` is the KL or L2 data discrepancy function
-    By setting :math:'\alpha' 0, we have:
+    By setting :math:'alpha' 0, we have:
 
     .. math::
-       \{x^{e}\}, x^h = \sum_e d( W^e x^e, p^e) + d(w^h x^h, p^h) + \lambda r({x^e}, x^h),
+       \{x^{e}, x^h \} = argmin \sum_e d( W^e x^e, p^e) + d(W^h x^h, p^h) + \lambda r({x^e}, x^h),
 
     which is defined in the TNV-regularized EDS tomography paper:
     TODO:add links
@@ -111,23 +112,29 @@ def dg_solver(projdata_e, projdata_h, nit, norm_e = 'L2', norm_d = 'L2', rec_sup
     g_e = []
     for e in projdata_e:
         if norm_e == 'KL':
-            g_e.append( (1-alpha)*odl.solvers.KullbackLeibler(e.ray_trafo.range, prior=e.data_odl))
+            g_e.append( (1-alpha)*odl.solvers.KullbackLeibler(e.ray_trafo.range,
+                       prior=e.data_odl))
         elif norm_e == 'L2':
-            g_e.append( (1-alpha)*odl.solvers.L2NormSquared(e.ray_trafo.range).translated(e.data_odl))
+            g_e.append( (1-alpha)*odl.solvers.L2NormSquared(e.ray_trafo.range
+                       ).translated(e.data_odl))
 
     if beta != 0:
         # Create data discrepancy for the projdata_h for x_h
         if norm_d == 'KL':
-            g_h = beta*odl.solvers.KullbackLeibler(projdata_h.ray_trafo.range, prior= projdata_h.data_odl)
+            g_h = beta*odl.solvers.KullbackLeibler(projdata_h.ray_trafo.range,
+                                                   prior= projdata_h.data_odl)
         elif norm_d == 'L2':
-            g_h = beta*odl.solvers.L2NormSquared(projdata_h.ray_trafo.range).translated(projdata_h.data_odl)
+            g_h = beta*odl.solvers.L2NormSquared(projdata_h.ray_trafo.range
+                                                 ).translated(projdata_h.data_odl)
 
     if alpha != 0:
     # Create data discrepancy for the HEBT term
         if norm_d == 'KL':
-            g_h = alpha*odl.solvers.KullbackLeibler(projdata_h.ray_trafo.range, prior= projdata_h.data_odl)
+            g_h = alpha*odl.solvers.KullbackLeibler(projdata_h.ray_trafo.range,
+                                                    prior= projdata_h.data_odl)
         elif norm_d == 'L2':
-            g_h = alpha*odl.solvers.L2NormSquared(projdata_h.ray_trafo.range).translated(projdata_h.data_odl)
+            g_h = alpha*odl.solvers.L2NormSquared(projdata_h.ray_trafo.range
+                                                  ).translated(projdata_h.data_odl)
 
     # Create regularization functional
     # Gradient
@@ -142,7 +149,8 @@ def dg_solver(projdata_e, projdata_h, nit, norm_e = 'L2', norm_d = 'L2', rec_sup
         diaggr = odl.DiagonalOperator(*grad_e)
         g_reg = lmbd*odl.solvers.NuclearNorm(diaggr.range, singular_vector_exp=1)
     elif regl is  'TV':
-        g_reg = odl.solvers.SeparableSum( *[lmbd*odl.solvers.GroupL1Norm(ge.range] for ge in grad_e)
+        g_reg = odl.solvers.SeparableSum( *[lmbd*odl.solvers.GroupL1Norm(ge.range 
+                                            for ge in grad_e))
     else:
         g_reg = None
 

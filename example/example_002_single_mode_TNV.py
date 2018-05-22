@@ -18,17 +18,18 @@ if __name__ == '__main__':
     pars.add_argument("--dim", type=int, default = 2, help = "The reconstruction dimension: 3D or 2D (slice by slice). 2: 2D; 3: 3D. Default is 2D.")
     pars.add_argument("--lmbd", type=float, default = 1e-1, help = "The regularization paratmeter.")
     pars.add_argument("--show", default = False, action ='store_true')
-    
+    pars.add_argument('-o', "--outputdir", type = str, default = '.', help = 'Output directory, defult is current directory')
+
     args = pars.parse_args()
     nit = args.nit
     dim = str(args.dim)+'D'
     slc = args.slice
     lmbd = args.lmbd
     show = args.show
+    save_dir = args.outputdir
     
     # temp
     slc = 50
-    show = False  
     if dim == '2D':
         try:
             assert(slc >= 0)
@@ -112,7 +113,6 @@ if __name__ == '__main__':
     #==================
     # save the figure
     #==================
-    save_dir = os.path.abspath( os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, 'temp')) 
     if not os.path.exists(save_dir):
         os.mkdir(save_dir)
 

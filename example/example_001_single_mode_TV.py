@@ -2,22 +2,24 @@ from etomo.objects import (Projection_data, Geometries)
 from etomo.utils import (image_bin,)
 import argparse
 import os
-import sys
 import scipy.misc as scms
 import scipy.io as scio
 import numpy as np
 import astra
+import odl
+
 if __name__ == '__main__':
-    # TODO
     # difine the parser
     
     pars = argparse.ArgumentParser()
     
     pars.add_argument("--nit", type=int, default = 100, help = "The number of iterations.")
-    pars.add_argument("--slice", type=int, default = -1, help = "The number of reconstructed slice. When the number is -1, the entire volume is reconstructed. Otherwise the slice indicated by the number is reconstructed.")
+    pars.add_argument('-s', "--slice", type=int, default = -1, help = "The number of reconstructed slice. When the number is -1, the entire volume is reconstructed. Otherwise the slice indicated by the number is reconstructed.")
     pars.add_argument("--dim", type=int, default = 2, help = "The reconstruction dimension: 3D or 2D (slice by slice). 2: 2D; 3: 3D. Default is 2D.")
     pars.add_argument("--lmbd", type=float, default = 1e-1, help = "The regularization paratmeter.")
     pars.add_argument("--show", default = False, action ='store_true')
+    pars.add_argument('-o', "--outputdir", type = str, default = '.', help = 'Output directory, defult is current directory')
+    pars.add_argument('-i', "--inputdir", type=str, default = '.', help = 'Input directory')
     
     args = pars.parse_args()
     nit = args.nit
@@ -25,10 +27,8 @@ if __name__ == '__main__':
     slc = args.slice
     lmbd = args.lmbd
     show = args.show
-    
-    # temp
-    slc = 50
-    show = False  
+    save_dir = args.outputdir
+
     if dim == '2D':
         try:
             assert(slc >= 0)
@@ -46,6 +46,7 @@ if __name__ == '__main__':
     p_h = data_mat['zMaps'].transpose(1, 2, 0) # shape P*M*N, P is the number of angles
     p_e = {'Au': data_mat['eMapsAu'].transpose(1, 2, 0), 'Ag': data_mat['eMapsAg'].transpose(1, 2, 0)} # P is the number of angles
     elements = ('Au', 'Ag')
+    print(p_h.shape)
     
     #=================
     # bin the data if necessary
@@ -70,8 +71,8 @@ if __name__ == '__main__':
         proj_geom_p = astra.create_proj_geom('parallel', 1.0, size_h,tilt_hd)
         vol_geom = astra.create_vol_geom(*[size_e]*2)
     elif dim == '3D':
-        proj_geom = astra.create_proj_geom('parallel3d', 1.0,1.0, size_e, size_e, tilt_eds)
-        proj_geom_p = astra.create_proj_geom('parallel3d', 1.0, size_h, 1.0, size_h,tilt_hd)
+        proj_geom_e = astra.create_proj_geom('parallel3d', 1.0, 1.0, size_e, size_e, tilt_eds)
+        proj_geom_p = astra.create_proj_geom('parallel3d', 1.0, 1.0, size_h, size_h,tilt_hd)
         vol_geom = astra.create_vol_geom(*[size_e]*3)
     else:
         raise ValueError('The dimension is not correct.')
@@ -112,24 +113,27 @@ if __name__ == '__main__':
     #==================
     # save the figure
     #==================
-    save_dir = os.path.abspath( os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, 'temp')) 
     if not os.path.exists(save_dir):
         os.mkdir(save_dir)
-
-    scms.imsave(os.path.join(save_dir, 'haadf_tv.png'), rec_hd/rec_hd.max())
-
+    if dim is '2D':
+        scms.imsave(os.path.join(save_dir, 'haadf_tv.png'), rec_hd/rec_hd.max())
+    elif dim is '3D':
+        scms.imsave(os.path.join(save_dir, 'haadf_tv.png'), rec_hd[rec_hd.shape[0]//2,:,:]/rec_hd.max())
+ 
     # Now try the DR algorithm
     rec_hd = data_hd.reconstruct( norm = 'KL', regularization = 'TV', alg = 'DR',  n_iter = 100, lmbd = 1000.0)
-
+    
     #==================
     # save the figure
     #==================
-    save_dir = os.path.abspath( os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, 'temp')) 
     if not os.path.exists(save_dir):
         os.mkdir(save_dir)
 
-    scms.imsave(os.path.join(save_dir, 'haadf_tv_DR.png'), rec_hd/rec_hd.max())
-
+    if dim is '2D':
+        scms.imsave(os.path.join(save_dir, 'haadf_tv_DR.png'), rec_hd/rec_hd.max())
+    elif dim is '3D':
+        scms.imsave(os.path.join(save_dir, 'haadf_tv_DR.png'), rec_hd[rec_hd.shape[0]//2,:,:]/rec_hd.max())
+ 
 
     # for element in elements:
     #     data_eds = projection_data( dnp_e[element], geom_e)          
