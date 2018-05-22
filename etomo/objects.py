@@ -256,8 +256,9 @@ class Projection_data:
             except:
                 raise Exception('rec_sub must have the same data shape.')
             x = rec_TNV(self.__data_odl, self.geometries.ray_trafo, rec_sub_odl, 
-                        norm, n_iter, lmbd, nonnegativity, regularization, 
+                        norm, n_iter, lmbd, nonnegativity, 
                         algorithm = alg, callback = callback)
+
             return x.asarray()
 
         elif regularization is 'joined_TNV':

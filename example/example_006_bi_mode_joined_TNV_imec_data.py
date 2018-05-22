@@ -135,16 +135,16 @@ if __name__ == '__main__':
                
     data_h = Projection_data(dnp_h, geom_h)
 #    data_h.normalize() # Normalize the data before reconstruct
-    data_h.normalize_01() # Normalize the data before reconstruct
+    data_h.normalize_01(max_r = 10.0) # Normalize the data before reconstruct
     
     data_e = Projection_data(dnp_e, geom_e)
-    data_e.normalize_01() # Normalize the data before reconstruct
+    data_e.normalize_01(max_r = 10.0) # Normalize the data before reconstruct
 
     #==================
     # save the figure
     #==================
 
-    rec_e = data_e.reconstruct(norm = 'L2', regularization = 'joined_TNV', alg = 'DR', n_iter = 200, lmbd = 0.4, data_h = data_h)
+    rec_e = data_e.reconstruct(norm = 'L2', regularization = 'joined_TNV', alg = 'DR', n_iter = 200, lmbd = 0.04, data_h = data_h)
 
     scms.imsave(os.path.join(save_dir, '006_{}_tnv.png'.format('Ti')), rec_e[0]/rec_e[0].max())
     scms.imsave(os.path.join(save_dir, '006_{}_tnv.png'.format('HAADF')), rec_e[1]/rec_e[1].max())
