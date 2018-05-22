@@ -1,0 +1,11 @@
+LICENSE
+MANIFEST.in
+README.md
+etomo/__init__.py
+etomo/objects.py
+etomo/recipes.py
+etomo/utils.py
+etomo.egg-info/PKG-INFO
+etomo.egg-info/SOURCES.txt
+etomo.egg-info/dependency_links.txt
+etomo.egg-info/top_level.txt

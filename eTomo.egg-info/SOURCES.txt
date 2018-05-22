@@ -1,8 +1,0 @@
-LICENSE
-MANIFEST.in
-README.md
-eTomo.egg-info/PKG-INFO
-eTomo.egg-info/SOURCES.txt
-eTomo.egg-info/dependency_links.txt
-eTomo.egg-info/top_level.txt
-etomo/__init__.py
