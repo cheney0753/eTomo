@@ -2,7 +2,6 @@ from etomo.objects import (Projection_data, Geometries)
 from etomo.utils import (image_bin,)
 import argparse
 import os
-import sys
 import scipy.misc as scms
 import scipy.io as scio
 import numpy as np

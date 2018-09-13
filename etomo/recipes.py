@@ -9,9 +9,9 @@ etomo.recipe module for the etomo package
 """
 
 import odl
-import astra
 import numpy as np
 from etomo.objects import (Projection_data,)
+
 #=================
 # the EDS data module
 #=================
@@ -37,17 +37,29 @@ class BT_recipe(object):
         if self.__ingredients['hebt'] == 'HEBT':
             if self.__ingredients['reg'] == 'TV':
                 x = dg_solver(self.projdata_e, self.projdata_h, n_iter, self.__ingredients['data'], regl = 'TV', lmbd = lmbd, alpha = alpha, callback = callback)
-            if self.___ingredients['reg'] == 'TNV':
+            if self.__ingredients['reg'] == 'TNV':
                 x = dg_solver(self.projdata_e, self.projdata_h, n_iter, self.__ingredients['data'], regl = 'TNV', lmbd = lmbd, alpha = alpha, callback = callback)
-                
+            if not self.__ingredients['reg']:
+                x = sirt_solver(self.projdata_e, self.projdata_h, n_iter, self.__ingredients['data'], alpha = alpha, callback = callback)
+        return x
+    
     @property
-    def ingredients():
-        return self.__ingredients_
+    def ingredients(self):
+        return self.__ingredients
+    
+#==========
+    # define a function to perform SIRT for HEBT using the astra backend
+#==========
+def sirt_solver(projdata_e, projdata_h, n_iter = 100, alpha = 0.5, callback = None):
+    
+    return -1
     
 #==========
     # define a function to perform the Douglas-Roughford algorithm using the odl backend
 #==========
-def dg_solver(projdata_e, projdata_h, nit, norm_e = 'L2', norm_d = 'L2', rec_sup = None,  regl = None, lmbd = 0.0, alpha = 1.0, beta = 1.0, callback = None ):
+def dg_solver(projdata_e, projdata_h, nit, norm_e = 'L2', norm_d = 'L2', 
+              rec_sup = None,  regl = None, lmbd = 0.0, alpha = 1.0,
+              callback = None ):
 
     """ 
     Solve the reconstruction problem with the recipe defined by the parameters
@@ -149,8 +161,8 @@ def dg_solver(projdata_e, projdata_h, nit, norm_e = 'L2', norm_d = 'L2', rec_sup
         diaggr = odl.DiagonalOperator(*grad_e)
         g_reg = lmbd*odl.solvers.NuclearNorm(diaggr.range, singular_vector_exp=1)
     elif regl is  'TV':
-        g_reg = odl.solvers.SeparableSum( *[lmbd*odl.solvers.GroupL1Norm(ge.range 
-                                            for ge in grad_e))
+        g_reg = odl.solvers.SeparableSum( *[lmbd*odl.solvers.GroupL1Norm(ge.range)
+                                            for ge in grad_e])
     else:
         g_reg = None
 
@@ -162,7 +174,7 @@ def dg_solver(projdata_e, projdata_h, nit, norm_e = 'L2', norm_d = 'L2', rec_sup
         g_data = odl.solvers.SeparableSum(*g_e, g_h)
     elif alpha != 0 and beta == 0:
         g_data = odl.solvers.SeparableSum(*g_e, g_sum)
-    elif alph !=0 and beta !=0:
+    elif alpha !=0 and beta !=0:
         g_data = odl.solvers.SeparableSum(*g_e, g_h, g_sum)
 
     # Assemble functionals g
